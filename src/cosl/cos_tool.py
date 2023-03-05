@@ -10,24 +10,27 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import yaml
+from typing_extensions import Concatenate, ParamSpec, TypeVar
 
 logger = logging.getLogger(__name__)
 
 _QueryType = Literal["logql", "promql"]
+_T = TypeVar("_T")
+_P = ParamSpec("_P")
 
 
-def ensure_querytype(func):
+def ensure_querytype(func: Callable[_P, _T]) -> Callable[Concatenate["CosTool", _P], _T]:
     """A small decorator to ensure that query type is specified."""
 
-    def wrapper(self, *args, **kwargs):
-        if not self._query_type and not kwargs.get("query_type", None):
+    def wrapper(self: "CosTool", *args: _P.args, **kwargs: _P.kwargs) -> _T:
+        if not self.query_type and not kwargs.get("query_type", None):
             raise TypeError(
                 "Either a default query type or a per-method query type must be used for `CosTool`!"
             )
-        return func(self, *args, **kwargs)
+        return func(self, *args, **kwargs)  # type: ignore
 
     wrapper.__doc__ = func.__doc__
     return wrapper
@@ -44,9 +47,10 @@ class CosTool:
 
     _path = None
     _disabled = False
+    query_type = None  # type: Union[_QueryType, None]
 
     def __init__(self, default_query_type: Optional[_QueryType] = None):
-        self._query_type = default_query_type
+        self.query_type = default_query_type
 
     @property
     def path(self):
@@ -61,9 +65,11 @@ class CosTool:
         return self._path
 
     @ensure_querytype
-    def apply_label_matchers(self, rules: dict, query_type: Optional[_QueryType] = None) -> dict:
+    def apply_label_matchers(
+        self, rules: Dict[str, Any], query_type: Optional[_QueryType] = None
+    ) -> Dict[str, Any]:
         """Will apply label matchers to the expression of all alerts in all supplied groups."""
-        query_type = query_type or self._query_type
+        query_type = query_type or self.query_type
         if not self.path:
             return rules
         for group in rules["groups"]:
@@ -82,15 +88,15 @@ class CosTool:
                     if label in rule["labels"]:
                         topology[label] = rule["labels"][label]
 
-                rule["expr"] = self.inject_label_matchers(rule["expr"], topology, query_type)
+                rule["expr"] = self.inject_label_matchers(rule["expr"], topology, query_type)  # type: ignore
         return rules
 
     @ensure_querytype
     def validate_alert_rules(
-        self, rules: dict, query_type: Optional[_QueryType] = None
+        self, rules: Dict[str, Any], query_type: Optional[_QueryType] = None
     ) -> Tuple[bool, str]:
         """Will validate correctness of alert rules, returning a boolean and any errors."""
-        query_type = query_type or self._query_type
+        query_type = query_type or self.query_type
         if not self.path:
             logger.debug("`cos-tool` unavailable. Not validating alert correctness.")
             return True, ""
@@ -109,7 +115,7 @@ class CosTool:
             #       - alert: OtherAlert
             #         expr: up
             if query_type == "logql":
-                transformed_rules = {"groups": []}  # type: ignore
+                transformed_rules = {"groups": []}  # type: Dict[str, Any]
                 for rule in rules["groups"]:
                     transformed = {"name": str(uuid.uuid4()), "rules": [rule]}
                     transformed_rules["groups"].append(transformed)
@@ -121,7 +127,7 @@ class CosTool:
             args = [str(self.path), "--format", query_type, "validate", str(rule_path)]
             # noinspection PyBroadException
             try:
-                self._exec(args)
+                self._exec(args)  # type: ignore
                 return True, ""
             except subprocess.CalledProcessError as e:
                 logger.debug("Validating the rules failed: %s", e.output.decode("utf-8"))
@@ -137,12 +143,12 @@ class CosTool:
     def inject_label_matchers(
         self,
         expression: str,
-        topology: dict,
+        topology: Dict[str, Any],
         query_type: Optional[_QueryType] = None,
         dashboard_variable: Optional[bool] = False,
     ) -> str:
         """Add label matchers to an expression."""
-        query_type = query_type or self._query_type
+        query_type = query_type or self.query_type
 
         if not topology:
             return expression
@@ -167,9 +173,9 @@ class CosTool:
         # noinspection PyBroadException
         try:
             return (
-                re.sub(r'="\$juju', r'=~"$juju', self._exec(args))
+                re.sub(r'="\$juju', r'=~"$juju', self._exec(args))  # type: ignore
                 if dashboard_variable
-                else self._exec(args)
+                else self._exec(args)  # type: ignore
             )
         except subprocess.CalledProcessError as e:
             logger.debug('Applying the expression failed: "%s", falling back to the original', e)
@@ -189,6 +195,6 @@ class CosTool:
             logger.debug('Could not locate cos-tool at: "{}"'.format(res))
         return None
 
-    def _exec(self, cmd) -> str:
+    def _exec(self, cmd: List[str]) -> str:
         result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return result.stdout.decode("utf-8").strip()

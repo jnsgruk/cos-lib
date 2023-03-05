@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "typing_extensions"]
 build-backend = "hatchling.build"
 
 [project]
@@ -61,6 +61,13 @@ docstring-convention = "google"
 copyright-check = "True"
 copyright-author = "Canonical Ltd."
 copyright-regexp = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+%(author)s"
+
+[tool.pyright]
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportIncompatibleMethodOverride = false
+reportImportCycles = false
+reportTypeCommentUsage = false
 
 # Static analysis tools configuration
 [tool.mypy]
