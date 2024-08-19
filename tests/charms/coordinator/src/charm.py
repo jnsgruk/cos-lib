@@ -23,7 +23,13 @@ class MyRolesConfig:
 
     roles = set(Role)
     meta_roles = {
-        "all": {Role.querier, Role.interrogator, Role.ingester, Role.compactor, Role.metrics_generator},
+        "all": {
+            Role.querier,
+            Role.interrogator,
+            Role.ingester,
+            Role.compactor,
+            Role.metrics_generator,
+        },
         "read": {Role.querier, Role.interrogator},
         "write": {Role.ingester, Role.compactor},
     }
