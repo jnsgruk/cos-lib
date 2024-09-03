@@ -44,16 +44,17 @@ def test_dump_to_mapping_append():
 
     # then you obtain it back, populated and with the existing data still there
     assert databag is out
-    assert databag == {"foo": json.dumps(1),
-                       "bar": json.dumps("baz"),
-                       "spurious": "data"}
+    assert databag == {"foo": json.dumps(1), "bar": json.dumps("baz"), "spurious": "data"}
 
 
-@pytest.mark.parametrize("example", (
-        {"foo":1, "bar":"baz"},
-        {"foo":10, "bar":"lol"},
-        {"foo":11, "bar":"hola hola", "extra":"field"},
-))
+@pytest.mark.parametrize(
+    "example",
+    (
+        {"foo": 1, "bar": "baz"},
+        {"foo": 10, "bar": "lol"},
+        {"foo": 11, "bar": "hola hola", "extra": "field"},
+    ),
+)
 def test_load(example):
     # given a databag model subclass
     # when you instantiate it from an existing mapping
@@ -63,11 +64,14 @@ def test_load(example):
     assert dm.foo == example["foo"]
 
 
-@pytest.mark.parametrize("example", (
-        {"foo":1, "bar":1},
-        {"foo":[1,2], "bar":"lol"},
-        {"bar":"hola"},
-))
+@pytest.mark.parametrize(
+    "example",
+    (
+        {"foo": 1, "bar": 1},
+        {"foo": [1, 2], "bar": "lol"},
+        {"bar": "hola"},
+    ),
+)
 def test_load_invalid_raises(example):
     # given a databag model subclass
     # when you instantiate it from an existing mapping with bad data

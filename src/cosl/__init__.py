@@ -4,11 +4,11 @@
 """Utils for observability Juju charms."""
 
 from .cos_tool import CosTool
+from .databag_model import DatabagModel, DataValidationError
 from .grafana_dashboard import GrafanaDashboard
 from .juju_topology import JujuTopology
 from .mandatory_relation_pairs import MandatoryRelationPairs
 from .rules import AlertRules, RecordingRules
-from .databag_model import DatabagModel, DataValidationError
 
 __all__ = [
     "JujuTopology",
