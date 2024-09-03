@@ -67,7 +67,7 @@ if PYDANTIC_IS_V1:
             if clear and to:
                 to.clear()
 
-            databag: _RawDatabag = to or {}
+            databag: _RawDatabag = to if to is not None else {}
 
             dct = self.dict()  # type: ignore
             for key, field in self.__fields__.items():  # type: ignore
@@ -121,7 +121,7 @@ else:
             if clear and to:
                 to.clear()
 
-            databag: _RawDatabag = to or {}
+            databag: _RawDatabag = to if to is not None else {}
 
             dct = self.model_dump()  # type: ignore
             for key, field in self.model_fields.items():  # type: ignore
