@@ -8,6 +8,7 @@ from .grafana_dashboard import GrafanaDashboard
 from .juju_topology import JujuTopology
 from .mandatory_relation_pairs import MandatoryRelationPairs
 from .rules import AlertRules, RecordingRules
+from .databag_model import DatabagModel, DataValidationError
 
 __all__ = [
     "JujuTopology",
@@ -16,4 +17,6 @@ __all__ = [
     "AlertRules",
     "RecordingRules",
     "MandatoryRelationPairs",
+    "DatabagModel",
+    "DataValidationError",
 ]
