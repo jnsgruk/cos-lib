@@ -6,6 +6,10 @@ Contains utility methods for standardized serialization/deserialization of relat
 import json
 import logging
 from typing import MutableMapping, Optional
+# Note: MutableMapping is imported from the typing module and not collections.abc
+# because subscripting collections.abc.MutableMapping was added in python 3.9, but
+# most of our charms are based on 20.04, which has python 3.8.
+
 
 import pydantic
 
@@ -123,11 +127,6 @@ else:
 
             databag: _RawDatabag = to if to is not None else {}
 
-            dct = self.model_dump()  # type: ignore
-            for key, field in self.model_fields.items():  # type: ignore
-                value = dct[key]
-                if value == field.default:
-                    continue
-                databag[field.alias or key] = json.dumps(value)
-
+            dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)  # type: ignore
+            databag.update({k: json.dumps(v) for k, v in dct.items()})
             return databag
