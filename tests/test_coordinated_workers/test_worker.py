@@ -1,12 +1,14 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import ops
 import pytest
 import tenacity
+import yaml
 from ops import Framework
 from ops.pebble import Layer, ServiceStatus
-from scenario import Container, Context, Mount, Relation, State
+from scenario import Container, Context, ExecOutput, Mount, Relation, State
 from scenario.runtime import UncaughtCharmError
 
 from cosl.coordinated_workers.worker import CONFIG_FILE, Worker
@@ -139,6 +141,7 @@ def test_worker_restarts_if_some_service_not_up(tmp_path):
         "foo",
         can_connect=True,
         mounts={"local": Mount(CONFIG_FILE, cfg)},
+        exec_mock={("update-ca-certificates", "--fresh"): ExecOutput()},
         service_status={
             "foo": ServiceStatus.INACTIVE,
             "bar": ServiceStatus.ACTIVE,
@@ -204,6 +207,7 @@ def test_worker_does_not_restart_external_services(tmp_path):
     cfg.write_text("some: yaml")
     container = Container(
         "foo",
+        exec_mock={("update-ca-certificates", "--fresh"): ExecOutput()},
         can_connect=True,
         mounts={"local": Mount(CONFIG_FILE, cfg)},
         layers={"foo": MyCharm.layer, "bar": other_layer},
@@ -311,6 +315,7 @@ def test_get_remote_write_endpoints(remote_databag, expected):
     )
     container = Container(
         "foo",
+        exec_mock={("update-ca-certificates", "--fresh"): ExecOutput()},
         can_connect=True,
     )
     relation = Relation(
@@ -323,3 +328,70 @@ def test_get_remote_write_endpoints(remote_databag, expected):
         charm = mgr.charm
         mgr.run()
         assert charm.worker.cluster.get_remote_write_endpoints() == expected
+
+
+def test_config_preprocessor():
+    # GIVEN a charm with a config preprocessor
+    new_config = {"modified": "config"}
+
+    class MyWorker(Worker):
+
+        @property
+        def _worker_config(self):
+            # mock config processor that entirely replaces the config with another,
+            # normally one would call super and manipulate
+            return new_config
+
+    class MyCharm(ops.CharmBase):
+        layer = Layer({"services": {"foo": {"command": ["bar"]}}})
+
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            self.worker = MyWorker(
+                self,
+                "foo",
+                lambda _: self.layer,
+                {"cluster": "cluster"},
+            )
+
+    ctx = Context(
+        MyCharm,
+        meta={
+            "name": "foo",
+            "requires": {"cluster": {"interface": "cluster"}},
+            "containers": {"foo": {"type": "oci-image"}},
+        },
+        config={
+            "options": {
+                "role-all": {"type": "boolean", "default": "true"},
+                "role-none": {"type": "boolean", "default": "false"},
+            }
+        },
+    )
+
+    # WHEN the charm writes the config to disk
+    state_out = ctx.run(
+        "config_changed",
+        State(
+            config={"role-all": True},
+            containers=[
+                Container(
+                    "foo",
+                    can_connect=True,
+                    exec_mock={("update-ca-certificates", "--fresh"): ExecOutput()},
+                )
+            ],
+            relations=[
+                Relation(
+                    "cluster",
+                    remote_app_data={
+                        "worker_config": json.dumps(yaml.safe_dump({"original": "config"}))
+                    },
+                )
+            ],
+        ),
+    )
+
+    # THEN the data gets preprocessed
+    fs = Path(str(state_out.get_container("foo").get_filesystem(ctx)) + CONFIG_FILE)
+    assert fs.read_text() == yaml.safe_dump(new_config)
