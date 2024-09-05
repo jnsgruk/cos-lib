@@ -6,11 +6,10 @@ Contains utility methods for standardized serialization/deserialization of relat
 import json
 import logging
 from typing import MutableMapping, Optional
+
 # Note: MutableMapping is imported from the typing module and not collections.abc
 # because subscripting collections.abc.MutableMapping was added in python 3.9, but
 # most of our charms are based on 20.04, which has python 3.8.
-
-
 import pydantic
 
 logger = logging.getLogger("databag_model")

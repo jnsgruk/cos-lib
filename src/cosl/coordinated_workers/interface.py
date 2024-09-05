@@ -20,7 +20,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Set,
 )
@@ -30,7 +29,6 @@ import ops
 import pydantic
 import yaml
 from ops import EventSource, Object, ObjectEvents, RelationCreatedEvent
-from pydantic import ConfigDict
 from typing_extensions import TypedDict
 
 import cosl
