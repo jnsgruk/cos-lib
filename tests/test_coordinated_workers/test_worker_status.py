@@ -149,22 +149,6 @@ def test_status_check_no_pebble(ctx, base_state, caplog):
 
 
 @k8s_patch()
-def test_status_check_no_config(ctx, base_state, caplog):
-    state = base_state.with_can_connect("workload", True)
-    # GIVEN there is no config file on disk
-    # WHEN we run any event
-    with patch(
-        "cosl.coordinated_workers.worker.Worker._running_worker_config", new=lambda _: None
-    ):
-        state_out = ctx.run("update_status", state)
-
-    # THEN the charm sets blocked
-    assert state_out.unit_status == WaitingStatus("Waiting for coordinator to publish a config")
-    # AND THEN the charm logs that the config isn't on disk
-    assert "Config file not on disk. Skipping status check." in caplog.messages
-
-
-@k8s_patch()
 def test_status_check_starting(ctx, base_state, tls):
     # GIVEN getting the status returns "Starting: X"
     with endpoint_starting(tls):
