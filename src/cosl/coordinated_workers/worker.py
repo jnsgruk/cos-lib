@@ -268,7 +268,7 @@ class Worker(ops.Object):
                         # Fire the pebble notice when pebble "ready" check reports "up".
                         # The assumption here is that pebble "ready" check would keep reporting "up"
                         # until it witnesses 3 consecutive failures, where 3 is set by the "threshold" field in the check layer.
-                        # So, we wait for 30 seconds before checking if its up so that we gurantee that the check is
+                        # So, we wait for 30 seconds before checking if its up so that we guarantee that the check is
                         # reporting the correct status.
                         "command": f"""bash -c 'while true; do sleep 30; /charm/bin/pebble checks ready | grep up &&
                                    /charm/bin/pebble notify {self.ready_notice_key} ||
