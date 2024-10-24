@@ -1,9 +1,8 @@
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from functools import partial
 from unittest.mock import MagicMock, patch
 
 import pytest
-import tenacity
 from ops import ActiveStatus, CharmBase, Framework, WaitingStatus
 from ops.pebble import Layer
 from scenario import Container, Context, ExecOutput, Relation, State
@@ -38,24 +37,6 @@ def k8s_patch(status=ActiveStatus(), is_ready=True):
             is_ready=MagicMock(return_value=is_ready),
         ) as patcher:
             yield patcher
-
-
-@pytest.fixture(autouse=True)
-def patch_status_wait():
-    with ExitStack() as stack:
-        # so we don't have to wait for minutes:
-        stack.enter_context(
-            patch(
-                "cosl.coordinated_workers.worker.Worker.SERVICE_STATUS_UP_RETRY_WAIT",
-                new=tenacity.wait_none(),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "cosl.coordinated_workers.worker.Worker.SERVICE_STATUS_UP_RETRY_STOP",
-                new=tenacity.stop_after_delay(2),
-            )
-        )
 
 
 @pytest.fixture
