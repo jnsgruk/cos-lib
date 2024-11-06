@@ -661,11 +661,24 @@ class Worker(ops.Object):
                     # restart all services that our layer is responsible for
                     self._container.restart(*service_names)
 
+        except ops.pebble.ConnectionError:
+            logger.debug(
+                "failed to (re)start worker jobs because the container unexpectedly died; "
+                "this might mean the unit is still settling after deploy or an upgrade. "
+                "This should resolve itself."
+                # or it's a juju bug^TM
+            )
+            return False
+
         except ops.pebble.ChangeError:
             logger.error(
                 "failed to (re)start worker jobs. This usually means that an external resource (such as s3) "
                 "that the software needs to start is not available."
             )
+            raise
+
+        except Exception:
+            logger.exception("failed to (re)start worker jobs due to an unexpected error.")
             raise
 
         try:
@@ -694,7 +707,7 @@ class Worker(ops.Object):
         except Exception:
             logger.exception("unexpected error while attempting to determine worker status")
 
-        return False
+        return self.status is ServiceEndpointStatus.up
 
     def running_version(self) -> Optional[str]:
         """Get the running version from the worker process."""
