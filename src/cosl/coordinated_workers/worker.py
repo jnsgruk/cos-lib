@@ -90,16 +90,9 @@ class Worker(ops.Object):
 
     # configuration for the service start retry logic in .restart().
     # this will determine how long we wait for pebble to try to start the worker process
-    SERVICE_START_RETRY_STOP = tenacity.stop_after_delay(60 * 15)
-    SERVICE_START_RETRY_WAIT = tenacity.wait_fixed(60)
+    SERVICE_START_RETRY_STOP = tenacity.stop_after_delay(60)
+    SERVICE_START_RETRY_WAIT = tenacity.wait_fixed(5)
     SERVICE_START_RETRY_IF = tenacity.retry_if_exception_type(ops.pebble.ChangeError)
-
-    # configuration for the service status retry logic after a restart has occurred.
-    # this will determine how long we wait for the worker process to report "ready" after it
-    # has been successfully restarted
-    SERVICE_STATUS_UP_RETRY_STOP = tenacity.stop_after_delay(60 * 15)
-    SERVICE_STATUS_UP_RETRY_WAIT = tenacity.wait_fixed(10)
-    SERVICE_STATUS_UP_RETRY_IF = tenacity.retry_if_not_result(bool)
 
     _endpoints: _EndpointMapping = {
         "cluster": "cluster",
@@ -310,8 +303,12 @@ class Worker(ops.Object):
             logger.debug(f"GET {check_endpoint} returned: {raw_out!r}.")
             return ServiceEndpointStatus.starting
 
-        except HTTPError:
-            logger.debug("Error getting readiness endpoint: server not up (yet)")
+        except HTTPError as e:
+            # While the workload is still starting, it'd return a 503 error code.
+            if e.code == 503:
+                logger.debug("Service is still starting")
+                return ServiceEndpointStatus.starting
+            logger.debug("Error getting readiness endpoint: server not up (yet) %s", e)
         except Exception:
             logger.exception("Unexpected exception getting readiness endpoint")
         return ServiceEndpointStatus.down
@@ -615,7 +612,7 @@ class Worker(ops.Object):
     def restart(self):
         """Restart the pebble service or start it if not already running, then wait for it to become ready.
 
-        Default timeout is 15 minutes. Configure it by setting this class attr:
+        Default timeout is 1 minutes. Configure it by setting this class attr:
         >>> Worker.SERVICE_START_RETRY_STOP = tenacity.stop_after_delay(60 * 30)  # 30 minutes
         You can also configure SERVICE_START_RETRY_WAIT and SERVICE_START_RETRY_IF.
 
@@ -647,7 +644,7 @@ class Worker(ops.Object):
             for attempt in tenacity.Retrying(
                 # this method may fail with ChangeError (exited quickly with code...)
                 retry=self.SERVICE_START_RETRY_IF,
-                # give this method some time to pass (by default 15 minutes)
+                # give this method some time to pass (by default 1 minutes)
                 stop=self.SERVICE_START_RETRY_STOP,
                 # wait 1 minute between tries
                 wait=self.SERVICE_START_RETRY_WAIT,
@@ -668,33 +665,7 @@ class Worker(ops.Object):
             )
             raise
 
-        try:
-            for attempt in tenacity.Retrying(
-                # status may report .down
-                retry=self.SERVICE_STATUS_UP_RETRY_IF,
-                # give this method some time to pass (by default 15 minutes)
-                stop=self.SERVICE_STATUS_UP_RETRY_STOP,
-                # wait 10 seconds between tries
-                wait=self.SERVICE_STATUS_UP_RETRY_WAIT,
-                # if you don't succeed raise the last caught exception when you're done
-                reraise=True,
-            ):
-                with attempt:
-                    self._charm.unit.status = MaintenanceStatus(
-                        f"waiting for worker process to report ready... (attempt #{attempt.retry_state.attempt_number})"
-                    )
-                # set result to status; will retry unless it's up
-                attempt.retry_state.set_result(self.status is ServiceEndpointStatus.up)
-
-        except WorkerError:
-            #  unable to check worker readiness: no readiness_check_endpoint configured.
-            # this status is already set on the unit so no need to log it
-            pass
-
-        except Exception:
-            logger.exception("unexpected error while attempting to determine worker status")
-
-        return False
+        return True
 
     def running_version(self) -> Optional[str]:
         """Get the running version from the worker process."""
